@@ -46,7 +46,7 @@ void selfCheck() {
     digitalWrite(LED_YELLOW, HIGH);
     digitalWrite(LED_GREEN, HIGH);
     Serial.println("All LEDs on");
-    delay(500);
+    delay(1000);
     
     // All LEDs off
     ledsOff();
@@ -87,6 +87,13 @@ void selfCheck() {
 
     // All good!
     for (int i=0; i<3; i++) {
+        digitalWrite(LED_GREEN, HIGH);
+        delay(300);
+        digitalWrite(LED_GREEN, LOW);
+        delay(300);
+    }
+    // Continue blinking until data available
+    while (!airSensor.dataAvailable()) {
         digitalWrite(LED_GREEN, HIGH);
         delay(300);
         digitalWrite(LED_GREEN, LOW);
