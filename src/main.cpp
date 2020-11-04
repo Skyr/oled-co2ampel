@@ -9,8 +9,7 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 
-#define OLED_RESET -1  // Reset pin # (or -1 if sharing Arduino reset pin)
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);   // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire);
 SCD30 airSensor;
 uint16_t co2buffer[SCREEN_WIDTH+1];
 
@@ -24,6 +23,8 @@ uint16_t co2buffer[SCREEN_WIDTH+1];
 // Number of seconds between measurements
 #define UPDATE_INTERVAL 15
 
+bool display_enabled = false;
+
 
 void ledsOff() {
     digitalWrite(LED_RED, LOW);
@@ -31,12 +32,16 @@ void ledsOff() {
     digitalWrite(LED_GREEN, LOW);
 }
 
+void blink(int pin, int d) {
+    digitalWrite(pin, HIGH);
+    delay(d);
+    digitalWrite(pin, LOW);
+    delay(d);
+}
+
 void blinkFail(int pin) {
     while (true) {
-        digitalWrite(pin, HIGH);
-        delay(500);
-        digitalWrite(pin, LOW);
-        delay(500);
+        blink(pin, 500);
     }
 }
 
@@ -85,19 +90,23 @@ void selfCheck() {
         blinkFail(LED_YELLOW);
     }
 
+    // Init display
+    if(display.begin(SSD1306_SWITCHCAPVCC, 0x3C, true)) {
+        display.clearDisplay();
+        display.display();
+        display_enabled = true;
+    } else {
+        Serial.println("Failed to initialize display");
+        display_enabled = false;
+    }
+
     // All good!
     for (int i=0; i<3; i++) {
-        digitalWrite(LED_GREEN, HIGH);
-        delay(300);
-        digitalWrite(LED_GREEN, LOW);
-        delay(300);
+        blink(display_enabled ? LED_GREEN : LED_YELLOW, 300);
     }
     // Continue blinking until data available
     while (!airSensor.dataAvailable()) {
-        digitalWrite(LED_GREEN, HIGH);
-        delay(300);
-        digitalWrite(LED_GREEN, LOW);
-        delay(300);
+        blink(LED_GREEN, 300);
     }
 }
 
@@ -124,7 +133,9 @@ void setup() {
 
 #define CO2_BAR_MIN 400
 #define CO2_BAR_MAX 1700
-#define BAR_MAX_LEN (SCREEN_HEIGHT - 25)
+#define BAR_MAX_LEN (SCREEN_HEIGHT - 15)
+#define YELLOW_THRESHOLD 1000
+#define RED_THRESHOLD 1500
 
 uint16_t barLen(uint16_t co2) {
     if (co2<CO2_BAR_MIN) {
@@ -141,14 +152,20 @@ void loop() {
     uint16_t co2 = 0;
     float humidity = 0;
 
+    // If data not yet available (clock drift?): Wait a moment
+    int retries = 5;
+    while (!airSensor.dataAvailable() && retries>0) {
+        delay(500);
+    }
+
     // Read data
     if (airSensor.dataAvailable()) {
         co2 = airSensor.getCO2();
         humidity = airSensor.getHumidity();
 
-        digitalWrite(LED_RED, (co2 >= 1500) ? HIGH : LOW);
-        digitalWrite(LED_YELLOW, (co2 > 1000 && co2 < 1500) ? HIGH : LOW);
-        digitalWrite(LED_GREEN, (co2 <= 1000) ? HIGH : LOW);
+        digitalWrite(LED_RED, (co2 >= RED_THRESHOLD) ? HIGH : LOW);
+        digitalWrite(LED_YELLOW, (co2 > YELLOW_THRESHOLD && co2 < RED_THRESHOLD) ? HIGH : LOW);
+        digitalWrite(LED_GREEN, (co2 <= YELLOW_THRESHOLD) ? HIGH : LOW);
         
 
         Serial.print("co2(ppm): ");
@@ -163,17 +180,19 @@ void loop() {
         Serial.println();
     }
 
-    // Update display
+    // Update data
     co2buffer[SCREEN_WIDTH] = co2;
-    // Update chart
-    for (int i=0; i<SCREEN_WIDTH; i++) {
-        uint16_t old_len = barLen(co2buffer[i]);
-        uint16_t new_len = barLen(co2buffer[i+1]);
-        if (old_len!=new_len) {
-            if (old_len<new_len) {
-                display.drawFastVLine(i, SCREEN_HEIGHT - 1 - new_len, new_len-old_len, WHITE);
-            } else {
-                display.drawFastVLine(i, SCREEN_HEIGHT - 1 - old_len, old_len-new_len, BLACK);
+    if (display_enabled) {
+        // Update chart
+        for (int i=0; i<SCREEN_WIDTH; i++) {
+            uint16_t old_len = barLen(co2buffer[i]);
+            uint16_t new_len = barLen(co2buffer[i+1]);
+            if (old_len!=new_len) {
+                if (old_len<new_len) {
+                    display.drawFastVLine(i, SCREEN_HEIGHT - 1 - new_len, new_len-old_len+1, WHITE);
+                } else {
+                    display.drawFastVLine(i, SCREEN_HEIGHT - 1 - old_len, old_len-new_len+1, BLACK);
+                }
             }
         }
     }
@@ -181,20 +200,32 @@ void loop() {
     for (int i=0; i<SCREEN_WIDTH; i++) {
         co2buffer[i] = co2buffer[i+1];
     }
-    // Draw 5 min lines
-    for (int x=SCREEN_WIDTH-1-(300/UPDATE_INTERVAL); x>0; x-=300/UPDATE_INTERVAL) {
-        uint16_t len = barLen(co2buffer[x]);
-        for (int y=BAR_MAX_LEN; y<SCREEN_HEIGHT - len; y+=2) {
-            display.drawPixel(x, y, WHITE);
+    if (display_enabled) {
+        // Draw 5 min lines
+        for (int x=SCREEN_WIDTH-1-(300/UPDATE_INTERVAL); x>0; x-=300/UPDATE_INTERVAL) {
+            uint16_t len = barLen(co2buffer[x]);
+            for (int y=SCREEN_HEIGHT - BAR_MAX_LEN; y<SCREEN_HEIGHT - len; y+=2) {
+                display.drawPixel(x, y, WHITE);
+            }
         }
+        // Draw line for yellow warning
+        for (int x=0; x<SCREEN_WIDTH; x+=2) {
+            display.drawPixel(x, SCREEN_HEIGHT - 1 - barLen(YELLOW_THRESHOLD), WHITE);
+        }
+        // Draw line for red warning
+        for (int x=0; x<SCREEN_WIDTH; x+=2) {
+            display.drawPixel(x, SCREEN_HEIGHT - 1 - barLen(RED_THRESHOLD), WHITE);
+        }
+        // Show text
+        display.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT - BAR_MAX_LEN, BLACK);
+        display.setTextSize(1);
+        display.setCursor(0, 0);
+        display.setTextColor(WHITE);
+        display.printf("%d ppm", co2);
+        display.setCursor(SCREEN_WIDTH * 2 / 3, 0);
+        display.printf("%02.1f %%", humidity);
+        display.display();
     }
-    // Show text
-    display.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT - BAR_MAX_LEN, BLACK);
-    display.setCursor(0, 0);
-    display.setTextColor(WHITE);
-    display.printf("%d ppm", co2);
-    display.setCursor(SCREEN_WIDTH * 3 / 4, 0);
-    display.printf("%02.1f %%", humidity);
 
     // Wait
     delay(UPDATE_INTERVAL * 1000);
