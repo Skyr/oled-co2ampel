@@ -22,6 +22,14 @@ module screw_mount(height) {
     }
 }
 
+module ventilation_slit(height) {
+    width=2;
+    translate([0,wall_thickness,0])
+    rotate([90,0,0])
+    linear_extrude(height=wall_thickness)
+        polygon(points=[ [0,0], [-width/2, 5], [-width/2,height-5], [0,height], [width/2,height-5],[width/2,5] ]);
+}
+
 module box() {
     board_screw_offset = 5.5;
     electronics_height = 30;
@@ -51,6 +59,7 @@ module box() {
                 }
             }
         }
+        // Holes for screws
         for (i=[0:1]) {
             for (j=[0:1]) {
                 translate([screwblock_diam/2 + i*(2*wall_thickness + 2*board_spacing + board_x-screwblock_diam), 
@@ -58,6 +67,22 @@ module box() {
                     wall_thickness + electronics_height ])
                         screw_hole(screw_height);
             }
+        }
+        // USB opening
+        usb_width = 14;
+        usb_height = 10;
+        translate([wall_thickness+board_spacing+48-(usb_width/2),0,wall_thickness+screw_height+8-(usb_height/2)]) cube([usb_width,wall_thickness,usb_height]);
+        // Ventilation slits
+        for (i=[0:5]) {
+            translate([wall_thickness+board_spacing+2+i*6,0,wall_thickness+screw_height])
+                ventilation_slit(electronics_height-screw_height);
+            translate([wall_thickness+board_spacing+2+i*6,wall_thickness+2*board_spacing+board_y,wall_thickness+screw_height])
+                ventilation_slit(electronics_height-screw_height);
+        }
+        for (i=[0:7]) {
+            translate([wall_thickness,wall_thickness+board_spacing+board_y/2-1+(i-3.5)*6,wall_thickness+screw_height])
+            rotate([0,0,90])
+                ventilation_slit(electronics_height-screw_height);
         }
     }
     
