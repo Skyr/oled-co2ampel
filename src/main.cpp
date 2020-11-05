@@ -20,8 +20,16 @@ uint16_t co2buffer[SCREEN_WIDTH+1];
 #define I2C_SCL     D1
 #define I2C_SDA     D2
 
+// Altitude (in meters). Atmospheric pressure (and thus the measurement) drops by 3% for every ~300m!
+#define ALTITUDE 445
 // Number of seconds between measurements
 #define UPDATE_INTERVAL 15
+
+#define CO2_BAR_MIN 350
+#define CO2_BAR_MAX 1700
+#define YELLOW_THRESHOLD 1000
+#define RED_THRESHOLD 1500
+
 
 bool display_enabled = false;
 
@@ -89,6 +97,11 @@ void selfCheck() {
         Serial.println("Failed to initialize SCD30 module");
         blinkFail(LED_YELLOW);
     }
+    if (ALTITUDE>0) {
+        if (!airSensor.setAltitudeCompensation(ALTITUDE)) {
+            Serial.println("Failed to set altitude compensation");
+        }
+    }
 
     // Init display
     if(display.begin(SSD1306_SWITCHCAPVCC, 0x3C, true)) {
@@ -101,6 +114,7 @@ void selfCheck() {
     }
 
     // All good!
+    Serial.println("Starting up, waiting for first data...");
     for (int i=0; i<3; i++) {
         blink(display_enabled ? LED_GREEN : LED_YELLOW, 300);
     }
@@ -130,12 +144,7 @@ void setup() {
     airSensor.setMeasurementInterval(UPDATE_INTERVAL);
 }
 
-
-#define CO2_BAR_MIN 400
-#define CO2_BAR_MAX 1700
 #define BAR_MAX_LEN (SCREEN_HEIGHT - 15)
-#define YELLOW_THRESHOLD 1000
-#define RED_THRESHOLD 1500
 
 uint16_t barLen(uint16_t co2) {
     if (co2<CO2_BAR_MIN) {
