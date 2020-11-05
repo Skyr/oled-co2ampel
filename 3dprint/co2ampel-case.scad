@@ -1,6 +1,10 @@
 wall_thickness = 3;
 screwhole_size = 1.5;  // For M2 screws
 screwblock_diam = 1.5*wall_thickness + screwhole_size;
+board_x = 82;
+board_y = 51;
+board_spacing = 3;
+screw_height = 3;
 
 module screw_hole(height) {
     translate([0,0,height/2]) 
@@ -19,11 +23,7 @@ module screw_mount(height) {
 }
 
 module box() {
-    board_x = 82;
-    board_y = 51;
-    board_spacing = 3;
     board_screw_offset = 5.5;
-    screw_height = 4;
     electronics_height = 30;
 
     module outer_box() {
@@ -78,4 +78,36 @@ module box() {
 }
 
 
-box();
+module lid() {
+    thickness = 1;
+    display_x = 14;
+    display_y = 25;
+    screw_x_ofs = 4;
+    screw_y_ofs = 1.5;
+    
+    difference() {
+        cube([2*wall_thickness + 2*board_spacing + board_x,
+            2*wall_thickness + 2*board_spacing + board_y,
+            thickness]);
+        for (i=[0:1]) {
+            for (j=[0:1]) {
+                translate([screwblock_diam/2 + i*(2*wall_thickness + 2*board_spacing + board_x-screwblock_diam), 
+                    screwblock_diam/2 + j*(2*wall_thickness + 2*board_spacing + board_y-screwblock_diam),
+                    0 ])
+                        screw_hole(thickness);
+            }
+        }
+        translate([wall_thickness + board_spacing + 32,(2*wall_thickness + 2*board_spacing + board_y - display_y)/2,0])
+            cube([display_x,display_y,thickness]);
+    }
+    translate([wall_thickness + board_spacing + 32,(2*wall_thickness + 2*board_spacing + board_y - display_y)/2,-screw_height]) {
+        translate([-screw_x_ofs,screw_y_ofs,0]) screw_mount(screw_height);
+        translate([display_x+screw_x_ofs,screw_y_ofs,0]) screw_mount(screw_height);
+        translate([-screw_x_ofs,display_y-screw_y_ofs,0]) screw_mount(screw_height);
+        translate([display_x+screw_x_ofs,display_y-screw_y_ofs,0]) screw_mount(screw_height);
+    }
+}
+
+
+translate([0,0,-30 - 20]) box();
+lid();
