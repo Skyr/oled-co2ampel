@@ -1,3 +1,7 @@
+// Written by Stefan Schlott
+// Licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+
+
 #include <Arduino.h>
 #include <Wire.h>
 

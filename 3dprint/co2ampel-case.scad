@@ -1,3 +1,6 @@
+// Written by Stefan Schlott
+// Licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+
 wall_thickness = 3;
 screw_size = 2; // M2 screw
 screwhole_size = 1.7;  // For M2 screws
