@@ -1,23 +1,29 @@
 wall_thickness = 3;
-screwhole_size = 1.5;  // For M2 screws
+screw_size = 2; // M2 screw
+screwhole_size = 1.7;  // For M2 screws
 screwblock_diam = 1.5*wall_thickness + screwhole_size;
 board_x = 82;
 board_y = 51;
 board_spacing = 3;
 screw_height = 3;
 
+module screw_opening(height) {
+    translate([0,0,height/2]) 
+        cylinder(height, d=screw_size, center=true, $fn=30);
+}
+
 module screw_hole(height) {
     translate([0,0,height/2]) 
         cylinder(height, d=screwhole_size, center=true, $fn=30);
 }
 
-module screw_block(height) {
-    translate([0,0,height/2]) cylinder(height, d=screwblock_diam, center=true, $fn=30);
+module screw_block(height, diam=screwblock_diam) {
+    translate([0,0,height/2]) cylinder(height, d=diam, center=true, $fn=30);
 }
 
-module screw_mount(height) {
+module screw_mount(height, diam=screwblock_diam) {
     difference() {
-        screw_block(height);
+        screw_block(height, diam);
         screw_hole(height);
     }
 }
@@ -31,7 +37,7 @@ module ventilation_slit(height) {
 }
 
 module box() {
-    board_screw_offset = 5.5;
+    board_screw_offset = 5.25;
     electronics_height = 30;
 
     module outer_box() {
@@ -71,7 +77,7 @@ module box() {
         // USB opening
         usb_width = 14;
         usb_height = 10;
-        translate([wall_thickness+board_spacing+48-(usb_width/2),0,wall_thickness+screw_height+8-(usb_height/2)]) cube([usb_width,wall_thickness,usb_height]);
+        translate([wall_thickness+board_spacing+49-(usb_width/2),0,wall_thickness+screw_height+8-(usb_height/2)]) cube([usb_width,wall_thickness,usb_height]);
         // Ventilation slits
         for (i=[0:5]) {
             translate([wall_thickness+board_spacing+2+i*6,0,wall_thickness+screw_height])
@@ -104,7 +110,7 @@ module box() {
 
 
 module lid() {
-    thickness = 1;
+    thickness = wall_thickness;
     display_x = 14;
     display_y = 25;
     screw_x_ofs = 4;
@@ -119,17 +125,17 @@ module lid() {
                 translate([screwblock_diam/2 + i*(2*wall_thickness + 2*board_spacing + board_x-screwblock_diam), 
                     screwblock_diam/2 + j*(2*wall_thickness + 2*board_spacing + board_y-screwblock_diam),
                     0 ])
-                        screw_hole(thickness);
+                        screw_opening(thickness);
             }
         }
         translate([wall_thickness + board_spacing + 32,(2*wall_thickness + 2*board_spacing + board_y - display_y)/2,0])
             cube([display_x,display_y,thickness]);
     }
     translate([wall_thickness + board_spacing + 32,(2*wall_thickness + 2*board_spacing + board_y - display_y)/2,-screw_height]) {
-        translate([-screw_x_ofs,screw_y_ofs,0]) screw_mount(screw_height);
-        translate([display_x+screw_x_ofs,screw_y_ofs,0]) screw_mount(screw_height);
-        translate([-screw_x_ofs,display_y-screw_y_ofs,0]) screw_mount(screw_height);
-        translate([display_x+screw_x_ofs,display_y-screw_y_ofs,0]) screw_mount(screw_height);
+        translate([-screw_x_ofs,screw_y_ofs,0]) screw_mount(screw_height, diam = screwhole_size + 2.5);
+        translate([display_x+screw_x_ofs,screw_y_ofs,0]) screw_mount(screw_height, screwhole_size + 2.5);
+        translate([-screw_x_ofs,display_y-screw_y_ofs,0]) screw_mount(screw_height, screwhole_size + 2.5);
+        translate([display_x+screw_x_ofs,display_y-screw_y_ofs,0]) screw_mount(screw_height, screwhole_size + 2.5);
     }
 }
 
