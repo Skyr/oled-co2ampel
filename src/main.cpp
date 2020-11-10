@@ -23,6 +23,7 @@ uint16_t co2buffer[SCREEN_WIDTH+1];
 #define LED_GREEN   D5
 #define I2C_SCL     D1
 #define I2C_SDA     D2
+#define CAL_BUTTON  D3
 
 // Altitude (in meters). Atmospheric pressure (and thus the measurement) drops by 3% for every ~300m!
 #define ALTITUDE 445
@@ -36,6 +37,8 @@ uint16_t co2buffer[SCREEN_WIDTH+1];
 
 
 bool display_enabled = false;
+bool do_calibration = false;
+unsigned long last_calibration = 0;
 
 
 void ledsOff() {
@@ -58,6 +61,8 @@ void blinkFail(int pin) {
 }
 
 void selfCheck() {
+    // Internal LED on
+    digitalWrite(LED_BUILTIN, LOW);
     // All LEDs on
     digitalWrite(LED_RED, HIGH);
     digitalWrite(LED_YELLOW, HIGH);
@@ -95,7 +100,7 @@ void selfCheck() {
     }
     delay(200);
 
-    airSensor.begin();
+    airSensor.begin(false);  // No auto calibration
     delay(500);
     if (!airSensor.beginMeasuring()) {
         Serial.println("Failed to initialize SCD30 module");
@@ -105,6 +110,8 @@ void selfCheck() {
         if (!airSensor.setAltitudeCompensation(ALTITUDE)) {
             Serial.println("Failed to set altitude compensation");
         }
+    } else {
+        airSensor.setAltitudeCompensation(0);
     }
 
     // Init display
@@ -117,6 +124,8 @@ void selfCheck() {
         display_enabled = false;
     }
 
+    // Internal LED off
+    digitalWrite(LED_BUILTIN, HIGH);
     // All good!
     Serial.println("Starting up, waiting for first data...");
     for (int i=0; i<3; i++) {
@@ -128,6 +137,15 @@ void selfCheck() {
     }
 }
 
+inline void ICACHE_RAM_ATTR isr_calButtonChanged() {
+    // Avoid triggering too soon
+    if (millis()-last_calibration>5000) {
+        do_calibration = true;
+        // As confirmation: Turn on internal LED
+        digitalWrite(LED_BUILTIN, LOW);
+    }
+}
+
 
 void setup() {
     Serial.begin(115200);
@@ -136,15 +154,20 @@ void setup() {
     memset(co2buffer, 0, sizeof(co2buffer));
 
     // Setup pins
+    pinMode(LED_BUILTIN, OUTPUT);
     pinMode(I2C_SCL, INPUT);
     pinMode(I2C_SDA, INPUT);
+    pinMode(CAL_BUTTON, INPUT);
     pinMode(LED_RED, OUTPUT);
     pinMode(LED_YELLOW, OUTPUT);
     pinMode(LED_GREEN, OUTPUT);
 
+    // Self check
     selfCheck();
-    ledsOff();
 
+    // Final initialization
+    ledsOff();
+    attachInterrupt(digitalPinToInterrupt(CAL_BUTTON), isr_calButtonChanged, FALLING);
     airSensor.setMeasurementInterval(UPDATE_INTERVAL);
 }
 
@@ -164,6 +187,20 @@ uint16_t barLen(uint16_t co2) {
 void loop() {
     uint16_t co2 = 0;
     float humidity = 0;
+
+    // Calibration
+    if (do_calibration) {
+        last_calibration = millis();
+        // Calibration to fresh air
+        airSensor.setForcedRecalibrationFactor(406);
+        // Reset flag
+        do_calibration = false;
+        // Flash internal LED as confirmation
+        for (int i=0; i<3; i++) {
+            blink(LED_BUILTIN, 500);
+        }
+        digitalWrite(LED_BUILTIN, HIGH);
+    }
 
     // If data not yet available (clock drift?): Wait a moment
     int retries = 5;

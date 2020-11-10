@@ -22,6 +22,15 @@ Auf dem Display sieht man die aktuell gemessene CO2-Konzentration sowie die rela
 
 ![Display-Legende](doc/display-legende.jpg)
 
+
+### Kalibrieren
+
+Die automatische Kalibrierung des SCD30 erfordert einen ununterbrochenen Betrieb über mindestens 7 Tage hinweg, wobei an jedem Tag mindestens eine Stunde frische Außenluft an den Sensor kommen muss.
+Da dies für die üblichen Belange unpraktikabel ist, ist die automatische Kalibrierung abgeschaltet. Stattdessen kann die Kalibrierung von Hand erfolgen:
+Hierzu bringt man die CO2-Ampel an frische (bewegungslose) Außenluft (von der angenommen wird, dass sie 406 ppm CO2 enthält) und wartet einige Minuten, bis sich die Messwerte stabilisiert haben.
+Nun verbindet man den Pin D3 mit GND (entweder durch Anbringen eines Tasters, oder provisorisch mit z.B. einem Dupont-Kabel). Als Quittung leuchtet die LED des ESP-Moduls. Blinkt sie und erlischt, ist die Kalibrierung abgeschlossen.
+
+
 ## Selber bauen
 
 ### Bauteile
